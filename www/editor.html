@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Editor stuff</title>
+<script src="js/util/gl-matrix.js"></script>
+<script src="js/util/fullscreen.js"></script>
+<script src="js/ace.js"></script>
+<script src="js/game.js"></script>
+<script src="js/util/soundmanager2.js"></script>
+<script src="js/util/soundmanager2_settings.js"></script>
+<script src="js/enginevoxel.js"></script>
+<script src="js/overworldbuffer.js"></script>
+
+<script src="dungeons/room.js"></script>
+<script src="dungeons/overworld.js"></script>
+
+<script src="actors/actor.js"></script>
+<script src="actors/avatar.js"></script>
+
+<link rel='stylesheet' type='text/css' href='//fonts.googleapis.com/css?family=Press+Start+2P'>
+
+</head>
+<body>
+<div id="progress"></div>
+
+<style>
+* { box-sizing: border-box; }
+a {
+  color: #33cc33;
+}
+
+body {
+  font-family: 'Press Start 2P';
+  transition: background-color 1s;
+  background-color: black;
+  overflow: hidden;
+  user-select: none;
+  -moz-user-select: none;
+  -webkit-user-select: none;
+  -ms-user-select: none;
+  margin: 0;
+  padding: 0;
+}
+canvas {
+  display: none;
+}
+
+#game-canvas {
+  position: fixed;
+  left: 0;
+  top: 0;
+  /* image-rendering: pixelated; */
+  background: #f4c6bc;
+  transition: margin-top 1s;
+}
+#game-canvas.paused {
+  margin-top: 340px;
+}
+#game-container {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-position: center center;
+  background-repeat: no-repeat;
+  transition: opacity 2s;
+  z-index: 10;
+}
+#game-container.hidden {
+  opacity: 0;
+}
+#game-container.visible {
+  opacity: 1;
+}
+#canvas-light-map {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 5000;
+  display: none;
+  width: 256px;
+  height: 256px;
+}
+
+#progress {
+  position: absolute;
+  top: 50%;
+  margin-top: -10px;
+  width: 100%;
+  text-align: center;
+  color: white;
+}
+
+</style>
+
+<div id="game-container" class="hidden"></div>
+<img id="lightmap" src="img/lightmap.png" style="display: none">
+<img id="light-lantern" src="img/light-lantern.png" style="display: none">
+<img id="light-red" src="img/light-red.png" style="display: none">
+<img id="light-black" src="img/light-black.png" style="display: none">
+<img id="shadow-round" src="img/shadow-round.png" style="display: none">
+<img id="light-fire" src="img/light-fire.png" style="display: none">
+<img id="shadow-obstacle" src="img/shadow-obstacle.png" style="display: none">
+<img id="light-star" src="img/light-star.png" style="display: none">
+
+<script>
+var game;
+var assetsReady = false;
+
+window.onload = function() {
+  assetsReady = true;
+}
+
+function init() {
+  if (!assetsReady) {
+    window.setTimeout(init, 250);
+  }
+}
+
+</script>
+<script src="js/preload.js"></script>
+</body>
+</html>

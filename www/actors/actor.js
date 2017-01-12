@@ -186,9 +186,10 @@ ace.Actor.prototype.spawn = function(game) {
  */
 ace.Actor.prototype.setFrame = function(frameName) {
   this.frame = frameName;
+  // not sure why there is a return here yet.
+  // So I commented out the rest. Keep this here until you understand why.
   return;
-
-  var frame = this.frames[frameName];
+  /*var frame = this.frames[frameName];
   if (frame) {
     for (key in frame) {
       this.div.style[key] = frame[key];
@@ -196,7 +197,7 @@ ace.Actor.prototype.setFrame = function(frameName) {
     this.currentFrame = frameName;
   } else {
     throw new Error('Could not find frame "' + frameName + '" in ' + this);
-  }
+  }*/
 };
 
 
@@ -223,37 +224,6 @@ ace.Actor.prototype.canWalk = function(dx, dy) {
 			return false;
 		}
 	}
-
-  /*if (this.isInUnderworld()) {
-
-    var room = game.getRoom(x, y, this.z);
-    if (!room.getTileAt(x, y).isWalkable) {
-      return false;
-    }
-
-    // This happens on the very edge of the map. Allow because otherwise
-    // the localX, localY wraps around and you can never escape.
-    var nextRoom = game.getRoom(x, y, this.z);
-    if (room != nextRoom) {
-      return true;
-    }
-    var localX = x % ace.UNDERWORLD_ROOM_PIXEL_WIDTH;
-    var localY = y % ace.UNDERWORLD_ROOM_PIXEL_HEIGHT;
-		var tileX = Math.floor(localX / ace.TILE_SIZE);
-		var tileY = Math.floor(localY / ace.TILE_SIZE);
-
-		// The avatar can walk through doors. Nobody else can.
-		if (this.name == 'Avatar') {
-			if (tileY == 5) {
-				if (tileX < 2) { return game.canExit(room, 'left') };
-				if (tileX > 13) { return game.canExit(room, 'right') };
-			} else if (localX > 120 && localX < 136) {
-				if (tileY < 2) { return game.canExit(room, 'down') };
-				if (tileY > 8) { return game.canExit(room, 'up') };
-			}
-	  }
-    return (tileX > 1 && tileX < 14 && tileY > 1 && tileY < 9);
-  }*/
 
   var tile = this.getTileAt(x, y, this.z);
   if (!tile) {

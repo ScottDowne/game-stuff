@@ -307,6 +307,23 @@ ace.randomInt = function(max) {
   return Math.floor(Math.random() * (max + 1));
 };
 
+ace.generateHeightMap = function(tileMap) {
+  var heightMap = [];
+  for (var z = 0; z < tileMap.length; z++) {
+    for (var y = 0; y < tileMap[z].length; y++) {
+      heightMap[y] = heightMap[y] || [];
+      for (var x = 0; x < tileMap[z][y].length; x++) {
+        if (!heightMap[y][x]) {
+          heightMap[y][x] = 0;
+        }
+        if (tileMap[z][y][x]) {
+          heightMap[y][x] += 16;
+        }
+      }
+    }
+  }
+  return heightMap;
+};
 
 /**
  * An number that will be incremented to give a unique id to those elements

@@ -50,12 +50,6 @@ ace.EngineVoxel = function(divId, opt_settings) {
   this.div.appendChild(this.canvas);
 
   /**
-   * The webgl canvas context.
-   */
-  this.gl = this.canvas.getContext('experimental-webgl', {antialias:false});
-  gl = this.gl;
-
-  /**
    * The size of the sprite voxel canvas, in pixels.
    */
   this.voxelSpriteCanvasWidth_ = 4096;
@@ -411,339 +405,235 @@ ace.EngineVoxel.prototype.setupWebGL_ = function() {
 
 
 
-  var vs = document.getElementById('vshader').textContent;
-  var fs = document.getElementById('fshader').textContent;
+  var vs = `
+    #ifdef GL_ES
+    precision highp float;
+    #endif
+
+    attribute vec3 aPosition;
+    attribute vec3 aNormal;
+
+    varying vec3 vNormal;
+    varying vec3 vPosition;
+    varying vec3 vWorldPosition;
+    varying float vFrontLightingFactor;
+    varying float vBackLightingFactor;
+
+    uniform mat4 uOffset;
+    uniform mat4 uMVP;
+
+    // Vector to the source of the main light.
+    uniform vec3 uLightDirection;
+
+    void main() {
+      vec3 normal = normalize((uOffset * vec4(aNormal, 0.0)).xyz);
+      vec4 position = uMVP * uOffset * vec4(aPosition, 1.0);
+      vNormal = aNormal;
+      gl_Position = position;
+      vPosition = aPosition;
+      vWorldPosition = vec3(uOffset * vec4(aPosition, 1.0));
+
+      vFrontLightingFactor = -0.2 + acos(dot(uLightDirection, normal)) / 3.0;
+      vec3 backLightDirection = -uLightDirection;
+      vBackLightingFactor = -0.2 + acos(dot(backLightDirection, normal)) / 3.0;
+    }
+  `;
+  var fs = `
+    #ifdef GL_ES
+    precision highp float;
+    #endif
+    varying vec3 vNormal;
+    varying vec3 vPosition;
+    varying vec3 vWorldPosition;
+    varying float vFrontLightingFactor;
+    varying float vBackLightingFactor;
+
+    float VOXEL_SPRITE_CANVAS_WIDTH = 4096.0;
+    float VOXEL_SPRITE_CANVAS_HEIGHT = 2048.0;
+    float VOXEL_SPRITE_SIZE = 16.0;
+    float VOXEL_SPRITE_PADDING = 1.0;
+    float VOXEL_SPRITE_SIZE_WITH_PADDING = VOXEL_SPRITE_SIZE + VOXEL_SPRITE_PADDING;
+    float xPixelSize = 1.0 / VOXEL_SPRITE_CANVAS_WIDTH;
+    float yPixelSize = 1.0 / VOXEL_SPRITE_CANVAS_HEIGHT;
+    float xHalfPixelSize = xPixelSize / 2.0;
+    float yHalfPixelSize = yPixelSize / 2.0;
+    float xSpritePixelSize = xPixelSize * VOXEL_SPRITE_SIZE_WITH_PADDING;
+    float ySpritePixelSize = yPixelSize * VOXEL_SPRITE_SIZE_WITH_PADDING;
+    float xSpriteStripWidth = xSpritePixelSize * VOXEL_SPRITE_SIZE_WITH_PADDING;
+    float xStripsPerRow = floor(1.0 / xSpriteStripWidth);
+    float OVERWORLD_HEIGHT = 1408.0;
+    float OVERWORLD_WIDTH = 4096.0;
+
+    float dungeonPixelSize = 1.0 / 2048.0;
+
+    float LIGHT_MAP_CANVAS_WIDTH = 256.0;
+    float LIGHT_MAP_CANVAS_HEIGHT = 256.0;
+    float LIGHT_MAP_UV_PER_PIXEL = 1.0 / 512.0;
+    float LIGHT_MAP_UV_PER_HALF_PIXEL = 0.5 / 512.0;
+
+    uniform sampler2D uSpriteSampler;
+    uniform sampler2D uLightSampler;
+    uniform sampler2D uDungeonSampler;
+    uniform float uSpriteId;
+    uniform vec3 uAvatarRoomOrigin;
+    uniform float uRenderNegativeColor;
+
+    vec2 getSpriteBaseUV(float id) {
+      vec2 uv;
+      float gridY = floor((id + .001) / xStripsPerRow);
+      float gridX = id - (gridY * xStripsPerRow);
+      uv[0] = xSpriteStripWidth * gridX;
+      uv[1] = 1.0 - (ySpritePixelSize * (gridY) + ySpritePixelSize);
+      return uv;
+    }
+
+    void main() {
+      vec3 pos = vPosition;
+      float lightingFactor = vBackLightingFactor;
+      if (gl_FrontFacing) {
+        pos -= vNormal;
+        lightingFactor = vFrontLightingFactor;
+      }
+
+      if (uSpriteId == -1.0) {
+
+
+
+        if (vWorldPosition.z > -100.0) {
+          float mapX = pos.x;
+          float mapY = pos.y;
+
+          // Use water if we're off the map.
+          if (vWorldPosition.y < 0.0 || vWorldPosition.x < 0.0 ||
+              vWorldPosition.x > 4096.0 || vWorldPosition.y > 1408.0) {
+            //gl_FragColor = vec4(32.0/255.0, 56.0/255.0, 236.0/255.0, 1.0);
+            mapX = mod(vWorldPosition.x, 16.0) - 32.0;
+            mapY = mod(vWorldPosition.y, 16.0);
+          }
+
+    		  float u = mapX * xPixelSize;
+    	    float v = mapY * yPixelSize;
+          float dz = (pos.z - floor(pos.z / 16.0) * 16.0);
+          u = u + (vNormal.x * dz) * xPixelSize;
+          v = v + (vNormal.y * dz) * yPixelSize;
+
+          gl_FragColor = vec4(texture2D(uSpriteSampler, vec2(u, v)).rgb, 1.0);
+        } else {
+          float mapX = vWorldPosition.x;
+          float mapY = vWorldPosition.y;
+          float u = mapX * dungeonPixelSize;
+          float v = mapY * dungeonPixelSize;
+          gl_FragColor = texture2D(uDungeonSampler, vec2(u, v));
+        }
+      } else {
+        float x = pos.x;
+        float y = pos.z;
+        float z = VOXEL_SPRITE_SIZE - pos.y;
+
+        float fx = floor(x + 0.0002);
+        float fy = floor(y + 0.0002);
+        float fz = floor(z + 0.0002);
+
+        vec2 uv = getSpriteBaseUV(uSpriteId);
+        uv[0] += fx * xPixelSize + xHalfPixelSize;
+        uv[0] += fz * xSpritePixelSize;
+        uv[1] += fy * yPixelSize + yHalfPixelSize;
+
+        gl_FragColor = texture2D(uSpriteSampler, uv);
+      }
+
+      if (uRenderNegativeColor > 0.5) {
+        gl_FragColor.rgb = vec3(1.8) - gl_FragColor.bgr;
+      }
+
+      gl_FragColor.rgb -= vec3(lightingFactor);
+
+
+      if (gl_FragColor.a < .01) {
+        discard;
+      }
+
+    	// Overworld hard shadows.
+    	float shadowHeight = 9000.0;
+    	if (vWorldPosition.z > -100.0) {
+    		float u2 = (vWorldPosition.x - 1.1) * xPixelSize;
+    		float v2 = (vWorldPosition.y - 1.1) * yPixelSize;
+    		float alpha = texture2D(uSpriteSampler, vec2(u2, v2)).a;
+    		float alphaQuantized = ceil(alpha * 255.0);
+    		shadowHeight = 464.0 - (alphaQuantized * 2.0) - 0.1;
+    		if (vWorldPosition.z < shadowHeight && shadowHeight < 463.0) {
+    			gl_FragColor.rgb -= vec3(0.3,0.3,0.3);
+    			gl_FragColor.r = floor(gl_FragColor.r * 8.0) / 8.0;
+    			gl_FragColor.g = floor(gl_FragColor.g * 8.0) / 8.0;
+    			gl_FragColor.a = 1.0;
+    		}
+    	}
+
+      // We apply the lighting map to everything in the underworld, or just the
+      // terrain in the overworld.
+      //if (vWorldPosition.z <= (shadowHeight - 1.0) || vWorldPosition.y < -1000.0) {
+    		vec3 gridPos = vWorldPosition;
+    		float lightX = vWorldPosition.x - uAvatarRoomOrigin.x;
+    		float lightY = vWorldPosition.y - uAvatarRoomOrigin.y;
+    		vec2 lightUv = vec2(0.25 + lightX * LIGHT_MAP_UV_PER_PIXEL - LIGHT_MAP_UV_PER_HALF_PIXEL,
+    												0.25 + lightY * LIGHT_MAP_UV_PER_PIXEL + LIGHT_MAP_UV_PER_HALF_PIXEL);
+    		vec3 color = vec3(texture2D(uLightSampler, lightUv));
+    		color = (color - 0.5) * 2.2;
+    		gl_FragColor.rgb += color;
+      //}
+    }
+  `;
   this.program = this.makeProgram(gl, vs, fs);
   var ctx = this.ctx;
 
-  this.registerVoxelSprite('boulder', 'img/sprite_boulder.png');
-  this.registerVoxelSprite('woodensword', 'img/sprite_woodensword.png');
-  this.registerVoxelSprite('itemwoodensword', 'img/sprites2/item_woodensword.png');
-
-  this.registerVoxelSprite('lockeddoor', 'img/sprites2/lockeddoor.png');
-  this.registerVoxelSprite('lockeddoortop', 'img/sprites2/lockeddoortop.png');
-  this.registerVoxelSprite('barreddoor', 'img/sprites2/barreddoor.png');
-  this.registerVoxelSprite('barreddoortop', 'img/sprites2/barreddoortop.png');
-
-  this.registerVoxelSprite('playerstand', 'img/player.png', 0);
-  this.registerVoxelSprite('playerwalk1', 'img/player.png', 1);
-  this.registerVoxelSprite('playerwalk2', 'img/player.png', 0);
-  this.registerVoxelSprite('playerwalk3', 'img/player.png', 2);
-  this.registerVoxelSprite('playerwalk4', 'img/player.png', 0);
-
-  this.registerVoxelSprite('linkstab', 'img/sprite_linkstab.png');
-  this.registerVoxelSprite('linknose', 'img/sprite_linknose.png');
-  this.registerVoxelSprite('linkyay', 'img/sprites2/sprite_linkyay.png');
-  this.registerVoxelSprite('linkyay2', 'img/sprites2/sprite_linkyay2.png');
-
-  this.registerVoxelSprite('forest_turtle', 'img/forest_turtle.png');
-  this.registerVoxelSprite('forest_bush', 'img/forest_bush.png');
-  this.registerVoxelSprite('ow_bush', 'img/ow_bush.png');
-  this.registerVoxelSprite('ow_turtle', 'img/ow_turtle.png');
-  this.registerVoxelSprite('ow_path', 'img/ow_path.png');
-
-  this.registerVoxelSprite('ow_tree_br', 'img/sprites/TreeBottomRightBrown.png');
-  this.registerVoxelSprite('ow_tree_bl', 'img/sprites/TreeBottomLeftBrown.png');
-  this.registerVoxelSprite('ow_tree_tr', 'img/sprites/TreeTopRightBrown.png');
-  this.registerVoxelSprite('ow_tree_tl', 'img/sprites/TreeTopLeftBrown.png');
-  this.registerVoxelSprite('ow_ent', 'img/sprites/TreeFaceBrown.png');
-
-  this.registerVoxelSprite('forest_tree_br', 'img/sprites/TreeBottomRightGreen.png');
-  this.registerVoxelSprite('forest_tree_bl', 'img/sprites/TreeBottomLeftGreen.png');
-  this.registerVoxelSprite('forest_tree_tr', 'img/sprites/TreeTopRightGreen.png');
-  this.registerVoxelSprite('forest_tree_tl', 'img/sprites/TreeTopLeftGreen.png');
-  this.registerVoxelSprite('forest_ent', 'img/sprites/TreeFaceGreen.png');
-
-
-  this.registerVoxelSprite('forest_rock_bl', 'img/forest_rock_bl.png');
-  this.registerVoxelSprite('forest_rock_br', 'img/forest_rock_br.png');
-
-  this.registerVoxelSprite('forest_rock_t', 'img/forest_rock_t.png');
-  this.registerVoxelSprite('forest_rock', 'img/forest_rock.png');
-  this.registerVoxelSprite('forest_rock_tl', 'img/forest_rock_tl.png');
-  this.registerVoxelSprite('forest_rock_tr', 'img/forest_rock_tr.png');
-
-  this.registerVoxelSprite('ow_sand', 'img/ow_sand.png');
-  this.registerVoxelSprite('ow_ground', 'img/ow_sand.png');
-
-  this.registerVoxelSprite('ow_rock_bl', 'img/ow_rock_bl.png');
-  this.registerVoxelSprite('ow_rock_br', 'img/ow_rock_br.png');
-  this.registerVoxelSprite('forest_knight', 'img/forest_knight.png');
-
-  this.registerVoxelSprite('ow_rock', 'img/ow_rock.png');
-  this.registerVoxelSprite('ow_rock_t', 'img/ow_rock_t.png');
-  this.registerVoxelSprite('ow_rock_tl', 'img/ow_rock_tl.png');
-  this.registerVoxelSprite('ow_rock_tr', 'img/ow_rock_tr.png');
-  this.registerVoxelSprite('ow_knight', 'img/ow_knight.png');
-  this.registerVoxelSprite('ow_cave', 'img/ow_cave.png');
-
-  this.registerVoxelSprite('ow_water_l', 'img/ow_water_l.png');
-  this.registerVoxelSprite('ow_water_t', 'img/ow_water_t.png');
-  this.registerVoxelSprite('ow_water_tl', 'img/ow_water_tl.png');
-  this.registerVoxelSprite('ow_water_tr', 'img/ow_water_tr.png');
-  this.registerVoxelSprite('ow_water_bl', 'img/ow_water_bl.png');
-  this.registerVoxelSprite('ow_water_br', 'img/ow_water_br.png');
-
-  this.registerVoxelSprite('ow_water_r', 'img/ow_water_r.png');
-
-  this.registerVoxelSprite('grave_bush', 'img/grave_bush.png');
-  this.registerVoxelSprite('grave_grave', 'img/grave_grave.png');
-  this.registerVoxelSprite('grave_knight', 'img/grave_knight.png');
-
-  this.registerVoxelSprite('Peahat', 'img/sprites/Spinner.png');
-
-  this.registerVoxelSprite('HurlerToughOdd', 'img/sprites/HurlerBlueEven.png');
-  this.registerVoxelSprite('HurlerToughEven', 'img/sprites/HurlerBlueOdd.png');
-  this.registerVoxelSprite('HurlerEven', 'img/sprites/HurlerRedEven.png');
-  this.registerVoxelSprite('HurlerOdd', 'img/sprites/HurlerRedOdd.png');
-  this.registerVoxelSprite('HurlerRock', 'img/HurlerRock.png');
-
-  this.registerVoxelSprite('ArcherEven', 'img/OrcOrangeEven.png');
-  this.registerVoxelSprite('ArcherOdd', 'img/OrcOrangeOdd.png');
-  this.registerVoxelSprite('ArcherToughOdd', 'img/OrcBlueOdd.png');
-  this.registerVoxelSprite('ArcherToughEven', 'img/OrcBlueEven.png');
-  this.registerVoxelSprite('ArcherArrow', 'img/ArcherArrow.png');
-
-  this.registerVoxelSprite('JumperUp', 'img/sprites/JumperBlueUp.png');
-  this.registerVoxelSprite('JumperDown', 'img/sprites/JumperBlueDown.png');
-  this.registerVoxelSprite('JumperToughUp', 'img/sprites/JumperOrangeUp.png');
-  this.registerVoxelSprite('JumperToughDown', 'img/sprites/JumperOrangeDown.png');
+  this.registerVoxelSprites([  
+      ['-', 'img/chars/char-.png'],
+      [',', 'img/chars/char,.png'],
+      ['!', 'img/chars/char!.png'],
+      ['.', 'img/chars/char..png'],
+      ['tick', 'img/chars/chartick.png'],
+      ['&', 'img/chars/char&.png'],
+      ['question', 'img/chars/charquestion.png'],
+      ['0', 'img/chars/char0.png'],
+      ['1', 'img/chars/char1.png'],
+      ['2', 'img/chars/char2.png'],
+      ['3', 'img/chars/char3.png'],
+      ['4', 'img/chars/char4.png'],
+      ['5', 'img/chars/char5.png'],
+      ['6', 'img/chars/char6.png'],
+      ['7', 'img/chars/char7.png'],
+      ['8', 'img/chars/char8.png'],
+      ['9', 'img/chars/char9.png'],
+      ['A', 'img/chars/charA.png'],
+      ['B', 'img/chars/charB.png'],
+      ['C', 'img/chars/charC.png'],
+      ['D', 'img/chars/charD.png'],
+      ['E', 'img/chars/charE.png'],
+      ['F', 'img/chars/charF.png'],
+      ['G', 'img/chars/charG.png'],
+      ['H', 'img/chars/charH.png'],
+      ['I', 'img/chars/charI.png'],
+      ['J', 'img/chars/charJ.png'],
+      ['K', 'img/chars/charK.png'],
+      ['L', 'img/chars/charL.png'],
+      ['M', 'img/chars/charM.png'],
+      ['N', 'img/chars/charN.png'],
+      ['O', 'img/chars/charO.png'],
+      ['P', 'img/chars/charP.png'],
+      ['Q', 'img/chars/charQ.png'],
+      ['R', 'img/chars/charR.png'],
+      ['S', 'img/chars/charS.png'],
+      ['T', 'img/chars/charT.png'],
+      ['U', 'img/chars/charU.png'],
+      ['V', 'img/chars/charV.png'],
+      ['W', 'img/chars/charW.png'],
+      ['X', 'img/chars/charX.png'],
+      ['Y', 'img/chars/charY.png'],
+      ['Z', 'img/chars/charZ.png']
+    ]);
 
 
-  this.registerVoxelSprite('coin', 'img/coin.png');
-  this.registerVoxelSprite('heart', 'img/heart.png');
-
-  this.registerVoxelSprite('death0', 'img/death0.png');
-  this.registerVoxelSprite('death1', 'img/death1.png');
-  this.registerVoxelSprite('death2', 'img/death2.png');
-  this.registerVoxelSprite('death3', 'img/death3.png');
-
-
-  this.registerVoxelSprite('-', 'img/chars/char-.png');
-  this.registerVoxelSprite(',', 'img/chars/char,.png');
-  this.registerVoxelSprite('!', 'img/chars/char!.png');
-  this.registerVoxelSprite('.', 'img/chars/char..png');
-  this.registerVoxelSprite('tick', 'img/chars/chartick.png');
-  this.registerVoxelSprite('&', 'img/chars/char&.png');
-  this.registerVoxelSprite('question', 'img/chars/charquestion.png');
-  this.registerVoxelSprite('0', 'img/chars/char0.png');
-  this.registerVoxelSprite('1', 'img/chars/char1.png');
-  this.registerVoxelSprite('2', 'img/chars/char2.png');
-  this.registerVoxelSprite('3', 'img/chars/char3.png');
-  this.registerVoxelSprite('4', 'img/chars/char4.png');
-  this.registerVoxelSprite('5', 'img/chars/char5.png');
-  this.registerVoxelSprite('6', 'img/chars/char6.png');
-  this.registerVoxelSprite('7', 'img/chars/char7.png');
-  this.registerVoxelSprite('8', 'img/chars/char8.png');
-  this.registerVoxelSprite('9', 'img/chars/char9.png');
-  this.registerVoxelSprite('A', 'img/chars/charA.png');
-  this.registerVoxelSprite('B', 'img/chars/charB.png');
-  this.registerVoxelSprite('C', 'img/chars/charC.png');
-  this.registerVoxelSprite('D', 'img/chars/charD.png');
-  this.registerVoxelSprite('E', 'img/chars/charE.png');
-  this.registerVoxelSprite('F', 'img/chars/charF.png');
-  this.registerVoxelSprite('G', 'img/chars/charG.png');
-  this.registerVoxelSprite('H', 'img/chars/charH.png');
-  this.registerVoxelSprite('I', 'img/chars/charI.png');
-  this.registerVoxelSprite('J', 'img/chars/charJ.png');
-  this.registerVoxelSprite('K', 'img/chars/charK.png');
-  this.registerVoxelSprite('L', 'img/chars/charL.png');
-  this.registerVoxelSprite('M', 'img/chars/charM.png');
-  this.registerVoxelSprite('N', 'img/chars/charN.png');
-  this.registerVoxelSprite('O', 'img/chars/charO.png');
-  this.registerVoxelSprite('P', 'img/chars/charP.png');
-  this.registerVoxelSprite('Q', 'img/chars/charQ.png');
-  this.registerVoxelSprite('R', 'img/chars/charR.png');
-  this.registerVoxelSprite('S', 'img/chars/charS.png');
-  this.registerVoxelSprite('T', 'img/chars/charT.png');
-  this.registerVoxelSprite('U', 'img/chars/charU.png');
-  this.registerVoxelSprite('V', 'img/chars/charV.png');
-  this.registerVoxelSprite('W', 'img/chars/charW.png');
-  this.registerVoxelSprite('X', 'img/chars/charX.png');
-  this.registerVoxelSprite('Y', 'img/chars/charY.png');
-  this.registerVoxelSprite('Z', 'img/chars/charZ.png');
-
-	this.registerVoxelSprite('aquamentusbottomleft', 'img/sprites2/aquamentusbottomleft.png');
-	this.registerVoxelSprite('aquamentusbottomleft2', 'img/sprites2/aquamentusbottomleft2.png');
-	this.registerVoxelSprite('aquamentusbottomright', 'img/sprites2/aquamentusbottomright.png');
-	this.registerVoxelSprite('aquamentusbottomright2', 'img/sprites2/aquamentusbottomright2.png');
-	this.registerVoxelSprite('aquamentustopleft', 'img/sprites2/aquamentustopleft.png');
-	this.registerVoxelSprite('aquamentustopleft2', 'img/sprites2/aquamentustopleft2.png');
-	this.registerVoxelSprite('aquamentustopright', 'img/sprites2/aquamentustopright.png');
-	this.registerVoxelSprite('fire', 'img/sprites2/fire2.png');
-	this.registerVoxelSprite('gel1', 'img/sprites2/gel1.png');
-	this.registerVoxelSprite('gel2', 'img/sprites2/gel2.png');
-
-	this.registerVoxelSprite('keese1', 'img/sprites2/keese1.png');
-	this.registerVoxelSprite('keese2', 'img/sprites2/keese2.png');
-	this.registerVoxelSprite('medicinewoman', 'img/sprites2/medicinewoman.png');
-	this.registerVoxelSprite('merchant', 'img/sprites2/merchant.png');
-	this.registerVoxelSprite('octoroc1', 'img/sprites2/octoroc1.png');
-	this.registerVoxelSprite('octoroc2', 'img/sprites2/octoroc2.png');
-	this.registerVoxelSprite('oldman1', 'img/sprites2/oldman1.png');
-	this.registerVoxelSprite('oldman2', 'img/sprites2/oldman2.png');
-	this.registerVoxelSprite('stalfos', 'img/sprites2/stalfos.png');
-	this.registerVoxelSprite('stalfos2', 'img/sprites2/stalfos2.png');
-	this.registerVoxelSprite('statue1', 'img/sprites2/statue1.png');
-	this.registerVoxelSprite('statue2', 'img/sprites2/statue2.png');
-	this.registerVoxelSprite('wallmaster1', 'img/sprites2/wallmaster1.png');
-	this.registerVoxelSprite('wallmaster2', 'img/sprites2/wallmaster2.png');
-	this.registerVoxelSprite('caverock', 'img/sprites2/caverock.png');
-	this.registerVoxelSprite('block', 'img/sprites2/block.png');
-	this.registerVoxelSprite('block_blue', 'img/sprites2/block_blue.png');
-	this.registerVoxelSprite('block_green', 'img/sprites2/block_green.png');
-	this.registerVoxelSprite('block_tan', 'img/sprites2/block_tan.png');
-	this.registerVoxelSprite('block_lime', 'img/sprites2/block_lime.png');
-	this.registerVoxelSprite('block_gray', 'img/sprites2/block_gray.png');
-
-	this.registerVoxelSprite('key', 'img/sprites2/key.png');
-	this.registerVoxelSprite('bomb', 'img/sprites2/bomb.png');
-	this.registerVoxelSprite('bombhole', 'img/sprites2/bombhole.png');
-	this.registerVoxelSprite('triforcepiece', 'img/sprites2/triforcepiece.png');
-	this.registerVoxelSprite('cloud', 'img/sprites2/cloud.png');
-	this.registerVoxelSprite('cloud2', 'img/sprites2/cloud2.png');
-	this.registerVoxelSprite('compass', 'img/sprites2/compass.png');
-
-	this.registerVoxelSprite('title-rock', 'img/title/title-rock.png');
-	this.registerVoxelSprite('title-rock-solid', 'img/title/title-rock-solid.png');
-	this.registerVoxelSprite('title-rocktop', 'img/title/title-rocktop.png');
-	this.registerVoxelSprite('title-water', 'img/title/title-water.png');
-	this.registerVoxelSprite('title-mist', 'img/title/title-mist.png');
-
-	this.registerVoxelSprite('gel1', 'img/sprites2/gel1.png');
-	this.registerVoxelSprite('gel2', 'img/sprites2/gel2.png');
-  this.registerVoxelSprite('map', 'img/sprites2/map.png');
-  this.registerVoxelSprite('goriya', 'img/sprites2/goriya.png');
-  this.registerVoxelSprite('goriya2', 'img/sprites2/goriya2.png');
-  this.registerVoxelSprite('goriya_blue', 'img/sprites2/goriya_blue.png');
-  this.registerVoxelSprite('goriya2_blue', 'img/sprites2/goriya2_blue.png');
-
-  this.registerVoxelSprite('blank', 'img/sprites2/blank.png');
-  this.registerVoxelSprite('trap', 'img/sprites2/trap.png');
-	this.registerVoxelSprite('whitebrick', 'img/sprites2/whitebrick.png');
-  this.registerVoxelSprite('bow', 'img/sprites2/bow.png');
-  this.registerVoxelSprite('boomerang', 'img/sprites2/boomerang.png');
-  this.registerVoxelSprite('boomerang_blue', 'img/sprites2/boomerang_blue.png');
-  this.registerVoxelSprite('boomerangflat', 'img/sprites2/boomerangflat.png');
-  this.registerVoxelSprite('boomerangflat_blue', 'img/sprites2/boomerangflat_blue.png');
-  this.registerVoxelSprite('heartcontainer', 'img/sprites2/heartcontainer.png');
-  this.registerVoxelSprite('fireball', 'img/sprites2/fireball.png');
-  this.registerVoxelSprite('leever1', 'img/sprites2/leever1.png');
-  this.registerVoxelSprite('leever2', 'img/sprites2/leever2.png');
-  this.registerVoxelSprite('leever3', 'img/sprites2/leever3.png');
-  this.registerVoxelSprite('leever4', 'img/sprites2/leever4.png');
-  this.registerVoxelSprite('zola', 'img/sprites2/zola.png');
-
-  this.registerVoxelSprite('leever1', 'img/sprites2/leever1.png');
-  this.registerVoxelSprite('leever2', 'img/sprites2/leever2.png');
-  this.registerVoxelSprite('leever3', 'img/sprites2/leever3.png');
-  this.registerVoxelSprite('leever4', 'img/sprites2/leever4.png');
-	this.registerVoxelSprite('leever5', 'img/sprites2/leever5.png');
-
-  this.registerVoxelSprite('leeverblue1', 'img/sprites2/leeverblue1.png');
-  this.registerVoxelSprite('leeverblue2', 'img/sprites2/leeverblue2.png');
-  this.registerVoxelSprite('leeverblue3', 'img/sprites2/leeverblue3.png');
-  this.registerVoxelSprite('leeverblue4', 'img/sprites2/leeverblue4.png');
-	this.registerVoxelSprite('leeverblue5', 'img/sprites2/leeverblue5.png');
-	this.registerVoxelSprite('whitesword', 'img/sprites2/whitesword.png');
-	this.registerVoxelSprite('swordshard-tl', 'img/sprites2/swordshard-tl.png');
-	this.registerVoxelSprite('swordshard-tr', 'img/sprites2/swordshard-tr.png');
-	this.registerVoxelSprite('swordshard-bl', 'img/sprites2/swordshard-bl.png');
-	this.registerVoxelSprite('swordshard-br', 'img/sprites2/swordshard-br.png');
-	this.registerVoxelSprite('heartblue', 'img/sprites2/heartblue.png');
-	this.registerVoxelSprite('coinblue', 'img/sprites2/coinblue.png');
-
-
-	this.registerVoxelSprite('forest_pillar_tl', 'img/sprites3/forest_pillar_tl.png');
-	this.registerVoxelSprite('forest_pillar_bl', 'img/sprites3/forest_pillar_bl.png');
-	this.registerVoxelSprite('forest_pillar_tr', 'img/sprites3/forest_pillar_tr.png');
-	this.registerVoxelSprite('forest_pillar_br', 'img/sprites3/forest_pillar_br.png');
-	this.registerVoxelSprite('forest_totem_t', 'img/sprites3/forest_totem_t.png');
-	this.registerVoxelSprite('forest_totem_b', 'img/sprites3/forest_totem_b.png');
-
-	this.registerVoxelSprite('ow_pillar_tl', 'img/sprites3/ow_pillar_tl.png');
-	this.registerVoxelSprite('ow_pillar_bl', 'img/sprites3/ow_pillar_bl.png');
-	this.registerVoxelSprite('ow_pillar_tr', 'img/sprites3/ow_pillar_tr.png');
-	this.registerVoxelSprite('ow_pillar_br', 'img/sprites3/ow_pillar_br.png');
-	this.registerVoxelSprite('ow_totem_t', 'img/sprites3/ow_totem_t.png');
-	this.registerVoxelSprite('ow_totem_b', 'img/sprites3/ow_totem_b.png');
-
-	this.registerVoxelSprite('grave_pillar_tl', 'img/sprites3/grave_pillar_tl.png');
-	this.registerVoxelSprite('grave_pillar_bl', 'img/sprites3/grave_pillar_bl.png');
-	this.registerVoxelSprite('grave_pillar_tr', 'img/sprites3/grave_pillar_tr.png');
-	this.registerVoxelSprite('grave_pillar_br', 'img/sprites3/grave_pillar_br.png');
-	this.registerVoxelSprite('grave_totem_t', 'img/sprites3/grave_totem_t.png');
-	this.registerVoxelSprite('grave_totem_b', 'img/sprites3/grave_totem_b.png');
-
-	this.registerVoxelSprite('rope1', 'img/sprites3/rope1.png');
-	this.registerVoxelSprite('rope2', 'img/sprites3/rope2.png');
-
-	this.registerVoxelSprite('statue_leftred', 'img/sprites2/statue_leftred.png');
-	this.registerVoxelSprite('statue_rightred', 'img/sprites2/statue_rightred.png');
-	this.registerVoxelSprite('statue_leftblue', 'img/sprites2/statue_leftblue.png');
-	this.registerVoxelSprite('statue_rightblue', 'img/sprites2/statue_rightblue.png');
-	this.registerVoxelSprite('statue_leftgreen', 'img/sprites2/statue_leftgreen.png');
-	this.registerVoxelSprite('statue_rightgreen', 'img/sprites2/statue_rightgreen.png');
-	this.registerVoxelSprite('statue_leftgray', 'img/sprites2/statue_leftgray.png');
-	this.registerVoxelSprite('statue_rightgray', 'img/sprites2/statue_rightgray.png');
-	this.registerVoxelSprite('statue_leftcyan', 'img/sprites2/statue_leftcyan.png');
-	this.registerVoxelSprite('statue_rightcyan', 'img/sprites2/statue_rightcyan.png');
-
-  this.registerVoxelSprite('zora', 'img/sprites3/zora.png');
-  this.registerVoxelSprite('bubbles', 'img/sprites3/bubbles.png');
-
-  this.registerVoxelSprite('dodongofront', 'img/sprites3/dodongofront.png');
-  this.registerVoxelSprite('dodongofront2', 'img/sprites3/dodongofront2.png');
-  this.registerVoxelSprite('dodongorear', 'img/sprites3/dodongorear.png');
-  this.registerVoxelSprite('dodongorear2', 'img/sprites3/dodongorear2.png');
-
-  this.registerVoxelSprite('zol1', 'img/sprites3/zol1.png');
-  this.registerVoxelSprite('zol2', 'img/sprites3/zol2.png');
-
-
-  this.registerVoxelSprite('dodongo_closed_head', 'img/sprites4/dodongo_closed_head.png');
-  this.registerVoxelSprite('dodongo_closed_tail', 'img/sprites4/dodongo_closed_tail.png');
-  this.registerVoxelSprite('dodongo_explode_head', 'img/sprites4/dodongo_explode_head.png');
-  this.registerVoxelSprite('dodongo_explode_tail', 'img/sprites4/dodongo_explode_tail.png');
-  this.registerVoxelSprite('dodongo_open_head', 'img/sprites4/dodongo_open_head.png');
-  this.registerVoxelSprite('dodongo_open_tail', 'img/sprites4/dodongo_open_tail.png');
-
-
-  this.registerVoxelSprite('darknut1', 'img/sprites4/darknut1.png');
-  this.registerVoxelSprite('darknut2', 'img/sprites4/darknut2.png');
-  this.registerVoxelSprite('raft', 'img/sprites3/raft.png');
-  this.registerVoxelSprite('bubble-red', 'img/sprites4/bubble-red.png');
-  this.registerVoxelSprite('bubble-blue', 'img/sprites4/bubble-blue.png');
-
-  this.registerVoxelSprite('ghost', 'img/sprites4/ghini.png');
-  this.registerVoxelSprite('manhandla_center', 'img/sprites4/manhandla_center.png');
-  this.registerVoxelSprite('manhandla_open', 'img/sprites4/manhandla_open.png');
-  this.registerVoxelSprite('manhandla_closed', 'img/sprites4/manhandla_closed.png');
-
-  this.registerVoxelSprite('ChargerEven', 'img/sprites4/lynel1.png');
-  this.registerVoxelSprite('ChargerOdd', 'img/sprites4/lynel2.png');
-  this.registerVoxelSprite('ChargerToughEven', 'img/sprites4/lynelblue1.png');
-  this.registerVoxelSprite('ChargerToughOdd', 'img/sprites4/lynelblue2.png');
-  this.registerVoxelSprite('fairy', 'img/sprites4/fairy.png');
-  this.registerVoxelSprite('fairy2', 'img/sprites4/fairy2.png');
-  this.registerVoxelSprite('sand', 'img/sprites4/sand.png');
-  this.registerVoxelSprite('sand25', 'img/sprites4/sand25.png');
-  this.registerVoxelSprite('sand50', 'img/sprites4/sand50.png');
-  this.registerVoxelSprite('sand75', 'img/sprites4/sand75.png');
-  this.registerVoxelSprite('water', 'img/sprites4/water.png');
-  this.registerVoxelSprite('whistle', 'img/sprites4/whistle.png');
-  this.registerVoxelSprite('stairs', 'img/sprites4/stairs.png');
-
-	// Title screen sprites.
-  for (var c = 0; c < 12; c++) {
-		for (var r = 0; r < 6; r++) {
-		  this.registerVoxelSprite('title' + c + '-' + r,
-		      'img/title/title' + c + '-' + r + '.png');
-		}
-	}
-  this.loadOverWorldTexture_();
   this.updateLightMap_();
-
 };
 
 
@@ -764,7 +654,6 @@ ace.EngineVoxel.prototype.onResize = function(viewport, wScale, hScale, topPaddi
   var letterBoxAmount = 1 - Math.min(1, (yFromStart / (topPadding * 2)));
 
   this.canvas.style.top = topPadding - ((topPadding/2) * letterBoxAmount) + 'px';
-  $('hud-panel').style.top = this.canvas.style.top;
 
 	this.canvas.width = w;
 	this.canvas.height = h;
@@ -869,7 +758,7 @@ ace.EngineVoxel.prototype.buildMVP_ = function(eye, target, up, opt_fovDegrees) 
  * @param {string} path The load path for the png with the voxel data.
  * @param {string} startX Useful if the image is in a sprite sheet.
  */
-ace.EngineVoxel.prototype.registerVoxelSprite = function(name, path, startX) {
+ace.EngineVoxel.prototype.registerVoxelSprite = function(name, path, startX, callback) {
   var img = new Image();
   var id = this.voxelSpriteCount_;
   img.spriteId = id;
@@ -896,10 +785,35 @@ ace.EngineVoxel.prototype.registerVoxelSprite = function(name, path, startX) {
           );
     }
 
+    if (callback) {
+      callback();
+    }
+
   }, this);
   img.src = path;
 };
 
+/**
+ * Loads a bunch of voxel sprites into our texture canvas and registers it by name.
+ * @param {string} name The friendly name of the sprite to register.
+ * @param {string} path The load path for the png with the voxel data.
+ * @param {string} startX Useful if the image is in a sprite sheet.
+ */
+ace.EngineVoxel.prototype.registerVoxelSprites = function(sprites, callback) {
+  var totalToLoad = sprites.length;
+  var totalLoaded = 0;
+  callback = callback || function() {};
+  sprites.forEach((sprite) => {
+    this.registerVoxelSprite(sprite[0], sprite[1], sprite[2] || 0, () => {
+      totalLoaded++;
+      if (totalToLoad == totalLoaded) {
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE,
+            this.spriteCanvas_);
+        callback();
+      }
+    });
+  });
+};
 
 /**
  * Returns whether a given sprite name has been registered.
@@ -920,26 +834,18 @@ ace.EngineVoxel.prototype.spriteHasBeenRegistered = function(name) {
  * @param {string} path The load path for the png with the voxel data.
  */
 ace.EngineVoxel.prototype.loadOverWorldTexture_ = function() {
-  var img = new Image();
-  img.onload = ace.bind(function() {
-    this.ctx.drawImage(img, 0,
+  //var img = new Image();
+  //img.onload = ace.bind(function() {
+    /*this.ctx.drawImage(img, 0,
         this.voxelSpriteCanvasHeight_ - this.overWorldNativeHeight_,
-        this.overWorldNativeWidth_, this.overWorldNativeHeight_);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE,
-        this.spriteCanvas_);
+        this.overWorldNativeWidth_, this.overWorldNativeHeight_);*/
+    //gl.activeTexture(gl.TEXTURE0);
+
     //gl.generateMipmap(gl.TEXTURE_2D);
 
     // Show the canvas.
-    this.dungeonCtx_.drawImage($('level1'), 0, 2048-1408);
-    this.updateDungeonTexture_();
-    this.canvas.display = 'block';
-    $('game-container').style.backgroundImage = 'none';
-    if (top.onGraphicsLoaded) {
-      top.onGraphicsLoaded();
-    }
-  }, this);
-  img.src = 'img/overworld_with_shadow_map15.png';
+  //}, this);
+  //img.src = 'img/overworld_with_shadow_map15.png';
 };
 
 
@@ -1386,20 +1292,4 @@ ace.EngineVoxel.prototype.preparePickBuffer_ = function() {
     this.pickDebugCanvas_.width = this.pickBuffer_.width * this.PICK_DEBUG_SCALE;
     this.pickDebugCanvas_.height = this.pickBuffer_.height * this.PICK_DEBUG_SCALE;
   }
-};
-
-/**
- * Changes the dungeon texture.
- * @param {WebGLRenderingContext} gl An initialized and current WebGL context.
- */
-ace.EngineVoxel.prototype.changeDungeonTexture = function(url, onReady) {
-  var img = document.createElement('img');
-  var self = this;
-  var onLoad = function() {
-    self.dungeonCtx_.drawImage(img, 0, 2048-1408);
-    self.updateDungeonTexture_();
-    onReady();
-  }
-  img.onload = onLoad;
-  img.src = url;
 };

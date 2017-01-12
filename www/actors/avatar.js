@@ -258,170 +258,6 @@ ace.Avatar.prototype.onTick = function(game) {
   }
   if (this.shieldDownCount > 0) this.shieldDownCount--;
 
-  function correctHeight(x, y, change) {
-    var grid = game.getGridXY(x, y);
-    var currentHeight = ace.heightMap[grid.y][grid.x];
-    var newHeight = Math.round((currentHeight + change)/16) * 16;
-    ace.heightMap[grid.y][grid.x] = newHeight;
-
-    top.heightMapCorrections = top.heightMapCorrections || {};
-    var key = grid.y + ',' + grid.x;
-    top.heightMapCorrections[key] = 'ace.heightMap[' + grid.y + '][' + grid.x + '] = ' + newHeight + ";\n"
-    console.clear()
-    var commands = '';
-    for (var key in top.tileMapCorrections) {
-      commands += top.tileMapCorrections[key];
-    }
-    for (var key in top.heightMapCorrections) {
-      commands += top.heightMapCorrections[key];
-    }
-    console.log(commands);
-  }
-  /*function correctTileMap(x, y) {
-    var grid = game.getGridXY(x, y);
-    var currentTile = ace.tileMap[grid.y][grid.x];
-
-    top.tileMapCorrections = top.tileMapCorrections || {};
-    var key = grid.y + ',' + grid.x;
-    newTile = prompt('What is it?', this.lastNewTile_ || 'ow_rock_br');
-    this.lastNewTile_ = newTile;
-    newTileId = ace.tileIdsByName[newTile];
-    ace.tileMap[grid.y][grid.x] = newTileId;
-
-    top.tileMapCorrections[key] = 'ace.tileMap[' + grid.y + '][' + grid.x + '] = ' + newTileId + ";\n"
-    console.clear()
-    var commands = '';
-    for (var key in top.tileMapCorrections) {
-      commands += top.tileMapCorrections[key];
-    }
-    for (var key in top.heightMapCorrections) {
-      commands += top.heightMapCorrections[key];
-    }
-    console.log(commands);
-  }*/
-
-  // Assorted debug-only capabilities.
-  if (('' + window.location).indexOf('debug') > -1) {
-    if (game.keyWasPressed('u')) {
-      correctHeight(this.x + 16 * ace.xMultByFacing[this.facing],
-                    this.y + 16 * ace.yMultByFacing[this.facing],
-                    16);
-    }
-    if (game.keyWasPressed('j')) {
-      correctHeight(this.x + 16 * ace.xMultByFacing[this.facing],
-                    this.y + 16 * ace.yMultByFacing[this.facing],
-                    -16);
-    }
-    if (game.keyWasPressed('h')) {
-      this.changeHitPoints(20);
-    }
-    if (game.keyWasPressed('b')) {
-      this.changeBombs(10);
-    }
-
-    if (game.keyWasPressed('e')) {
-      //correctTileMap(this.x + 16 * ace.xMultByFacing[this.facing],
-      //               this.y + 16 * ace.yMultByFacing[this.facing]);
-    }
-
-
-
-    if (game.keyWasPressed('1')) {
-
-      this.x = 1924;
-      this.y = 765;
-      this.z = 0;
-      game.state.inventory['itemwoodensword'] = 1;
-    }
-    if (game.keyWasPressed('2')) {
-      this.x = 3180;
-      this.y = 770;
-      this.z = 0;
-      game.state.inventory['itemwoodensword'] = 1;
-    }
-    if (game.keyWasPressed('3')) {
-      this.x = 1157;
-      this.y = 67;
-      this.z = 0;
-      game.state.inventory['itemwoodensword'] = 1;
-    }
-    if (game.keyWasPressed('4')) {
-      this.x = 1417;
-      this.y = 589;
-      this.z = 0;
-      game.state.inventory['itemwoodensword'] = 1;
-    }
-    if (game.keyWasPressed('5')) {
-      this.x = 2932;
-      this.y = 1294;
-      this.z = 0;
-      game.state.inventory['itemwoodensword'] = 1;
-    }
-    if (game.keyWasPressed('6')) {
-      this.x = 645;
-      this.y = 950;
-      this.z = 0;
-      game.state.inventory['itemwoodensword'] = 1;
-    }
-    if (game.keyWasPressed('7')) {
-      this.x = 640;
-      this.y = 570;
-      this.z = 0;
-      game.state.inventory['itemwoodensword'] = 1;
-    }
-    if (game.keyWasPressed('8')) {
-      this.x = 3475;
-      this.y = 312;
-      this.z = 0;
-      game.state.inventory['itemwoodensword'] = 1;
-    }
-    if (game.keyWasPressed('9')) {
-      this.x = 1401;
-      this.y = 1279;
-      this.z = 0;
-      game.state.inventory['itemwoodensword'] = 1;
-    }
-    if (game.keyWasPressed('0')) {
-      // Zoom to Dodongo.
-      game.avatar.x = 952
-      game.avatar.y = 1288
-      game.avatar.z = -1008
-      game.changeDungeon('2');
-      game.avatar.changeBombs(99);
-      this.currentItem = 'bomb';
-      game.state.inventory['itemwoodensword'] = 1;
-      game.refreshInfoPanel();
-    }
-    if (game.keyWasPressed('m')) {
-      // Zoom to Manhandla.
-      game.avatar.x = 1150
-      game.avatar.y = 570
-      game.avatar.z = -1008
-      game.changeDungeon('3');
-      game.avatar.changeBombs(99);
-      this.currentItem = 'bomb';
-      game.state.inventory['itemwoodensword'] = 1;
-      game.refreshInfoPanel();
-    }
-    if (game.keyWasPressed('n')) {
-      // Zoom to lake sand.
-      game.avatar.x = 660
-      game.avatar.y = 580
-      game.avatar.z = 0
-      game.avatar.changeBombs(99);
-      this.currentItem = 'whistle';
-      game.state.inventory['itemwoodensword'] = 1;
-      game.state.inventory['whistle'] = 1;
-      game.refreshInfoPanel();
-    }
-    if (game.keyIsDown(ace.KEY_SHIFT)) {
-      if (game.keyWasPressed(ace.KEY_RIGHT)) { this.x += 128 };
-      if (game.keyWasPressed(ace.KEY_LEFT)) { this.x -= 128 };
-      if (game.keyWasPressed(ace.KEY_DOWN)) { this.y -= 176/2 };
-      if (game.keyWasPressed(ace.KEY_UP)) { this.y += 176/2 };
-    }
-	}
-
   if (!this.isFrozen) {
 
 		if (game.keyIsDown(ace.KEY_LEFT) || game.keyIsDown('a')) {
@@ -645,7 +481,6 @@ ace.Avatar.prototype.takeDamage = function(damage) {
     this.hitPoints = .5;
   }
 
-  game.refreshInfoPanel();
   if (damage != 0) {
     this.refreshHealthBeeps();
   }
@@ -671,7 +506,6 @@ ace.Avatar.prototype.shieldIsUp = function(direction) {
 ace.Avatar.prototype.changeCoins = function(coins) {
   game.state.coins += coins;
   game.playSound('coin');
-  game.refreshInfoPanel();
 };
 
 
@@ -683,7 +517,6 @@ ace.Avatar.prototype.changeCoins = function(coins) {
 ace.Avatar.prototype.changeHitPoints = function(points) {
   this.hitPoints = Math.min(this.hitPoints += points, this.maxHitPoints);
   game.playSound('heart');
-  game.refreshInfoPanel();
   this.refreshHealthBeeps();
 };
 
@@ -711,7 +544,6 @@ ace.Avatar.prototype.changeMaxHitPoints = function(points) {
   this.hitPoints = this.maxHitPoints;
   game.state.maxHitPoints = this.maxHitPoints;
   game.playSound('item');
-  game.refreshInfoPanel();
   this.refreshHealthBeeps();
 };
 
@@ -725,7 +557,6 @@ ace.Avatar.prototype.changeKeys = function(keys) {
   if (keys > 0) {
     game.playSound('heart');
   }
-  game.refreshInfoPanel();
 };
 
 /**
@@ -737,7 +568,6 @@ ace.Avatar.prototype.changeBombs = function(bombs) {
   if (bombs > 0) {
     game.playSound('heart');
   }
-  game.refreshInfoPanel();
 };
 
 /**
@@ -788,14 +618,12 @@ ace.Avatar.prototype.pickUp = function(item, teleportTo) {
 	  game.state.hasCompassByDungeon = game.state.hasCompassByDungeon || {};
 	  game.state.hasCompassByDungeon[game.currentDungeon_.name] = true;
 	  game.playSound('item');
-	  game.refreshInfoPanel();
 	  return;
 	}
 	if (item == 'map') {
 	  game.state.hasMapByDungeon = game.state.hasMapByDungeon || {};
 	  game.state.hasMapByDungeon[game.currentDungeon_.name] = true;
 	  game.playSound('item');
-	  game.refreshInfoPanel();
 	  return;
 	}
 
@@ -811,8 +639,6 @@ ace.Avatar.prototype.pickUp = function(item, teleportTo) {
 	}
   game.state.inventory[item] = game.state.inventory[item] || 0;
   game.state.inventory[item]++;
-
-  game.refreshInfoPanel();
 
   this.pickingUp = item;
   this.facing = 'down';
