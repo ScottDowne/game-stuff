@@ -106,19 +106,12 @@ canvas {
 
 <script>
 var game;
-var assetsReady = false;
-
-window.onload = function() {
-  assetsReady = true;
-}
-
-function init() {
-  if (!assetsReady) {
-    window.setTimeout(init, 250);
-  }
+if (!window.WebGLRenderingContext) {
+  $('progress').innerHTML = 'SORRY, YOU NEED WEBGL...<p>TRY A DIFFERENT BROWSER.';
+} else {
+  game = new ace.Game('game-container');
 }
 
 </script>
-<script src="js/preload.js"></script>
 </body>
 </html>

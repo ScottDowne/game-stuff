@@ -451,8 +451,6 @@ ace.EngineVoxel.prototype.setupWebGL_ = function() {
     float OVERWORLD_HEIGHT = 1408.0;
     float OVERWORLD_WIDTH = 4096.0;
 
-    float dungeonPixelSize = 1.0 / 2048.0;
-
     float LIGHT_MAP_CANVAS_WIDTH = 256.0;
     float LIGHT_MAP_CANVAS_HEIGHT = 256.0;
     float LIGHT_MAP_UV_PER_PIXEL = 1.0 / 512.0;
@@ -564,6 +562,7 @@ ace.EngineVoxel.prototype.setupWebGL_ = function() {
   this.program = this.makeProgram(gl, vs, fs);
   var ctx = this.ctx;
 
+  // Some default voxels sprites that are generically useful.
   this.registerVoxelSprites([
       ['-', 'img/chars/char-.png'],
       [',', 'img/chars/char,.png'],
@@ -729,7 +728,6 @@ ace.EngineVoxel.prototype.buildMVP_ = function(eye, target, up, opt_fovDegrees) 
   return mvp;
 }
 
-
 /**
  * Loads a voxel sprite into our texture canvas and registers it by name.
  * @param {string} name The friendly name of the sprite to register.
@@ -772,22 +770,24 @@ ace.EngineVoxel.prototype.registerVoxelSprite = function(name, path, startX, cal
 };
 
 /**
- * Loads a bunch of voxel sprites into our texture canvas and registers it by name.
- * @param {string} name The friendly name of the sprite to register.
- * @param {string} path The load path for the png with the voxel data.
- * @param {string} startX Useful if the image is in a sprite sheet.
+ * Calls registerVoxelSprite for each sprite in the sprite array.
+ * @param {array} sprites The sprites array.
+ * @param {function} each optional function to call when a single sprite is loaded.
+ * @param {function} finished The optional function to call when all sprites are loaded.
  */
-ace.EngineVoxel.prototype.registerVoxelSprites = function(sprites, callback) {
+ace.EngineVoxel.prototype.registerVoxelSprites = function(sprites, each, finished) {
   var totalToLoad = sprites.length;
   var totalLoaded = 0;
-  callback = callback || function() {};
+  finished = finished || function() {};
+  each = each || function() {};
   sprites.forEach((sprite) => {
     this.registerVoxelSprite(sprite[0], sprite[1], sprite[2] || 0, () => {
       totalLoaded++;
+      each(Math.floor(100 * totalLoaded / totalToLoad));
       if (totalToLoad == totalLoaded) {
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE,
             this.spriteCanvas_);
-        callback();
+        finished();
       }
     });
   });

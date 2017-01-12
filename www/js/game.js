@@ -32,7 +32,7 @@ ace.Game = function(divId, opt_settings) {
   this.engine =  settings['engine'] || new ace.EngineVoxel(divId, opt_settings);
 
 
-
+  // Some game specific voxel sprites.
   this.engine.registerVoxelSprites([
     ['playerstand', 'img/player.png', 0],
     ['playerwalk1', 'img/player.png', 1],
@@ -57,12 +57,15 @@ ace.Game = function(divId, opt_settings) {
     ['ow_sand', 'img/ow_sand.png'],
     ['ow_ground', 'img/ow_sand.png'],
     ['ow_path', 'img/ow_path.png']
-  ], () => {
+  ], (percent) => {
+    $('progress').innerHTML = percent + '%';
+    $('progress').style.opacity = 1.2 - (percent / 100);
+  }, () => {
+    $('progress').innerHTML = 'GENERATING WORLD...';
     this.engine.canvas.display = 'block';
     $('game-container').style.backgroundImage = 'none';
-    if (top.onGraphicsLoaded) {
-      top.onGraphicsLoaded();
-    }
+    $('game-container').className = 'visible';
+    $('progress').style.display = 'none';
   });
 
   this.tileMap = [[
