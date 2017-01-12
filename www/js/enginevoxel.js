@@ -94,19 +94,6 @@ ace.EngineVoxel = function(divId, opt_settings) {
   this.lightMapCtx_.drawImage($('lightmap'), 0, 0, ace.LIGHT_MAP_WIDTH, ace.LIGHT_MAP_HEIGHT);
 
   /**
-   * The dungeon canvas. This holds the texture that's mapped onto the underworld.
-   */
-  this.dungeonCanvas_ = this.document.createElement('canvas');
-  this.dungeonCanvas_.setAttribute('screencanvas', '0');
-  this.dungeonCanvas_.width = ace.DUNGEON_CANVAS_SIZE;
-  this.dungeonCanvas_.height = ace.DUNGEON_CANVAS_SIZE;
-  this.dungeonCanvas_.id = 'dungeon-texture';
-  this.div.appendChild(this.dungeonCanvas_);
-  this.dungeonCtx_ = this.dungeonCanvas_.getContext('2d');
-  this.dungeonCtx_.fillStyle = 'rgb(0, 0, 0)';
-  this.dungeonCtx_.fillRect(0, 0, ace.DUNGEON_CANVAS_SIZE, ace.DUNGEON_CANVAS_SIZE);
-
-  /**
    * The voxel sprite canvas.
    */
   this.spriteCanvas_ = this.document.createElement('canvas');
@@ -473,7 +460,6 @@ ace.EngineVoxel.prototype.setupWebGL_ = function() {
 
     uniform sampler2D uSpriteSampler;
     uniform sampler2D uLightSampler;
-    uniform sampler2D uDungeonSampler;
     uniform float uSpriteId;
     uniform vec3 uAvatarRoomOrigin;
     uniform float uRenderNegativeColor;
@@ -499,32 +485,24 @@ ace.EngineVoxel.prototype.setupWebGL_ = function() {
 
 
 
-        if (vWorldPosition.z > -100.0) {
-          float mapX = pos.x;
-          float mapY = pos.y;
+        float mapX = pos.x;
+        float mapY = pos.y;
 
-          // Use water if we're off the map.
-          if (vWorldPosition.y < 0.0 || vWorldPosition.x < 0.0 ||
-              vWorldPosition.x > 4096.0 || vWorldPosition.y > 1408.0) {
-            //gl_FragColor = vec4(32.0/255.0, 56.0/255.0, 236.0/255.0, 1.0);
-            mapX = mod(vWorldPosition.x, 16.0) - 32.0;
-            mapY = mod(vWorldPosition.y, 16.0);
-          }
-
-    		  float u = mapX * xPixelSize;
-    	    float v = mapY * yPixelSize;
-          float dz = (pos.z - floor(pos.z / 16.0) * 16.0);
-          u = u + (vNormal.x * dz) * xPixelSize;
-          v = v + (vNormal.y * dz) * yPixelSize;
-
-          gl_FragColor = vec4(texture2D(uSpriteSampler, vec2(u, v)).rgb, 1.0);
-        } else {
-          float mapX = vWorldPosition.x;
-          float mapY = vWorldPosition.y;
-          float u = mapX * dungeonPixelSize;
-          float v = mapY * dungeonPixelSize;
-          gl_FragColor = texture2D(uDungeonSampler, vec2(u, v));
+        // Use water if we're off the map.
+        if (vWorldPosition.y < 0.0 || vWorldPosition.x < 0.0 ||
+            vWorldPosition.x > 4096.0 || vWorldPosition.y > 1408.0) {
+          //gl_FragColor = vec4(32.0/255.0, 56.0/255.0, 236.0/255.0, 1.0);
+          mapX = mod(vWorldPosition.x, 16.0) - 32.0;
+          mapY = mod(vWorldPosition.y, 16.0);
         }
+
+  		  float u = mapX * xPixelSize;
+  	    float v = mapY * yPixelSize;
+        float dz = (pos.z - floor(pos.z / 16.0) * 16.0);
+        u = u + (vNormal.x * dz) * xPixelSize;
+        v = v + (vNormal.y * dz) * yPixelSize;
+
+        gl_FragColor = vec4(texture2D(uSpriteSampler, vec2(u, v)).rgb, 1.0);
       } else {
         float x = pos.x;
         float y = pos.z;
@@ -586,7 +564,7 @@ ace.EngineVoxel.prototype.setupWebGL_ = function() {
   this.program = this.makeProgram(gl, vs, fs);
   var ctx = this.ctx;
 
-  this.registerVoxelSprites([  
+  this.registerVoxelSprites([
       ['-', 'img/chars/char-.png'],
       [',', 'img/chars/char,.png'],
       ['!', 'img/chars/char!.png'],
@@ -829,43 +807,12 @@ ace.EngineVoxel.prototype.spriteHasBeenRegistered = function(name) {
 
 
 /**
- * Loads a voxel sprite into our texture canvas and registers it by name.
- * @param {string} name The friendly name of the sprite to register.
- * @param {string} path The load path for the png with the voxel data.
- */
-ace.EngineVoxel.prototype.loadOverWorldTexture_ = function() {
-  //var img = new Image();
-  //img.onload = ace.bind(function() {
-    /*this.ctx.drawImage(img, 0,
-        this.voxelSpriteCanvasHeight_ - this.overWorldNativeHeight_,
-        this.overWorldNativeWidth_, this.overWorldNativeHeight_);*/
-    //gl.activeTexture(gl.TEXTURE0);
-
-    //gl.generateMipmap(gl.TEXTURE_2D);
-
-    // Show the canvas.
-  //}, this);
-  //img.src = 'img/overworld_with_shadow_map15.png';
-};
-
-
-/**
  * Updates the light map texture for use in the shader.
  */
 ace.EngineVoxel.prototype.updateLightMap_ = function() {
   gl.activeTexture(gl.TEXTURE1);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE,
       this.lightMapCanvas_);
-  gl.activeTexture(gl.TEXTURE0);
-};
-
-/**
- * Updates the dungeon map texture for use in the shader.
- */
-ace.EngineVoxel.prototype.updateDungeonTexture_ = function() {
-  gl.activeTexture(gl.TEXTURE2);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE,
-      this.dungeonCanvas_);
   gl.activeTexture(gl.TEXTURE0);
 };
 
@@ -1205,22 +1152,6 @@ ace.EngineVoxel.prototype.makeProgram = function(gl, vs, fs) {
 
 
   gl.uniform1i(this.uLightSamplerLoc, 1);
-
-
-  // Light Texture -----------------------------------------------------------
-  this.uDungeonSamplerLoc = gl.getUniformLocation(program, "uDungeonSampler");
-  var texture = gl.createTexture();
-  this.dungeonTexture_ = texture;
-  gl.activeTexture(gl.TEXTURE2);
-
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.dungeonCanvas_);
-    // This makes a nearest pixel match. Sharper but blockier.
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-
-  gl.uniform1i(this.uDungeonSamplerLoc, 2);
 
 
   this.setUpAttribute_(gl, program, 'aPosition', 3, gl.FLOAT);
