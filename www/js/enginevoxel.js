@@ -249,16 +249,6 @@ ace.EngineVoxel.prototype.onTick = function(refreshPick) {
   mat4.identity(this.uOffsetTransform_);
   gl.uniformMatrix4fv(this.uOffsetLoc, false, this.uOffsetTransform_);
 
-  // The door triangles are stuck on the back end of the world buffer.
-  //var worldBufferLength = ace.overWorldBufferData_.length - 32;
-  //gl.drawArrays(gl.TRIANGLES, 0, worldBufferLength / this.vertexStride_);
-
-	/*if (game.currentRoom_.exitByFacing) {
-		if (game.currentRoom_.exitByFacing['left']) { this.drawWall('left'); }
-		if (game.currentRoom_.exitByFacing['right']) { this.drawWall('right'); }
-		if (game.currentRoom_.exitByFacing['up']) { this.drawWall('up'); }
-		if (game.currentRoom_.exitByFacing['down']) { this.drawWall('down'); }
-	}*/
 };
 
 
@@ -266,27 +256,7 @@ ace.EngineVoxel.prototype.setLightDirection = function(vector) {
   gl.uniform3fv(this.uLightDirectionLoc, vector);
 };
 
-/*ace.EngineVoxel.prototype.drawWall = function(facing) {
-  var centerX = Math.floor(game.avatar.x / 256) * 256 + 256 / 2;
-  var centerY = Math.floor(game.avatar.y / 176) * 176 + 176 / 2;
-  centerX += 112 * ace.xMultByFacing[facing];
-  centerY += 72 * ace.yMultByFacing[facing];
-  this.drawRelativeDoor_([centerX, centerY, -1008], ace.getRotZByFacing(facing));
-};
 
-ace.EngineVoxel.prototype.drawRelativeDoor_ = function(offset, rotZ) {
-  var worldBufferLength = ace.overWorldBufferData_.length - 32;
-
-  mat4.identity(this.uOffsetTransform_);
-  mat4.translate(this.uOffsetTransform_, this.uOffsetTransform_, offset);
-  if (rotZ) {
-    mat4.rotateZ(this.uOffsetTransform_, this.uOffsetTransform_, rotZ);
-  }
-  mat4.translate(this.uOffsetTransform_, this.uOffsetTransform_, [-13, -16, 0]);
-  gl.uniformMatrix4fv(this.uOffsetLoc, false, this.uOffsetTransform_);
-  gl.drawArrays(gl.TRIANGLES, worldBufferLength / this.vertexStride_, 48 / this.vertexStride_);
-
-}*/
 
 
 /**
