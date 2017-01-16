@@ -125,12 +125,6 @@ ace.inherits(ace.Avatar, ace.Actor);
  * @param {ace.Game} The game.
  */
 ace.Avatar.prototype.onTick = function(game) {
-
-  if (game.isStartScreen()) {
-    // Don't do anything during the start screen.
-    return;
-  }
-
   if (this.hitPoints <= 0) {
     // Death animation.
     if (this.hitPoints > -999) {
