@@ -168,6 +168,9 @@ ace.EngineVoxel = function(divId, opt_settings) {
 */
 ace.EngineVoxel.prototype.drawLight = function(lightImg, worldX, worldY, size, alpha, rotation) {
 
+  if (!game.avatar) {
+    return;
+  }
 	// The current "room" is drawn within a centered 256x256 region
 	// of the light map. That center region is the room where the avatar
 	// is, so we render shadows and things relative to that.
@@ -235,12 +238,17 @@ ace.EngineVoxel.prototype.clearLightMap = function() {
  * Handles the next frame. Tick!
  */
 ace.EngineVoxel.prototype.onTick = function(refreshPick) {
-
+  var x = 0;
+  var y = 0;
+  if (game.avatar) {
+    x = game.avatar.x;
+    y = game.avatar.y;
+  }
 	// Tell the shader where the avatar is, for relative light
 	// map reads.
   gl.uniform3fv(this.uAvatarRoomOriginLoc,
-    [Math.floor(game.avatar.x / 256) * 256,
-     Math.floor(game.avatar.y / 176) * 176, 0]);
+    [Math.floor(x / 256) * 256,
+     Math.floor(y / 176) * 176, 0]);
 
   this.updateLightMap_();
 
@@ -748,9 +756,14 @@ ace.EngineVoxel.prototype.registerVoxelSprite = function(name, path, startX, cal
 ace.EngineVoxel.prototype.registerVoxelSprites = function(sprites, each, finished) {
   var totalToLoad = sprites.length;
   var totalLoaded = 0;
+  var wait = 1000;
   finished = finished || function() {};
   each = each || function() {};
-  sprites.forEach((sprite) => {
+  function next() {
+    var sprite = sprites.shift();
+    if (!sprite) {
+      return;
+    }
     this.registerVoxelSprite(sprite[0], sprite[1], sprite[2] || 0, () => {
       totalLoaded++;
       each(Math.floor(100 * totalLoaded / totalToLoad));
@@ -758,9 +771,13 @@ ace.EngineVoxel.prototype.registerVoxelSprites = function(sprites, each, finishe
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE,
             this.spriteCanvas_);
         finished();
+      } else {
+        next();
       }
     });
-  });
+  }
+  next = ace.bind(next, this);
+  next();
 };
 
 /**

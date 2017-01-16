@@ -113,7 +113,7 @@ ace.Avatar = function(game, room) {
   this.shieldDownCount = 0;
   this.swordLength = 33;
 
-  this.facing = 'down';
+  this.facing = 'right';
   this.action = 'Walk';
   this.walkFrame = 0;
 };
@@ -145,7 +145,7 @@ ace.Avatar.prototype.onTick = function(game) {
     this.draw('playerstand');
 
     var redLength = 75;
-    game.engine.drawLight($('light-red'), this.x, this.y,512,
+    game.engineVoxel.drawLight($('light-red'), this.x, this.y,512,
                           Math.min(.8, this.deathCount / redLength));
 
     if (this.deathCount == redLength) {
@@ -179,11 +179,11 @@ ace.Avatar.prototype.onTick = function(game) {
       this.zOffset = Math.abs(Math.cos(this.triforceAnimationCount / 4)) * 3 + 1;
       var flashFrames = {1:true, 30: true, 32: true, 40:true, 42:true, 50:true, 52:true,  70:true, 72:true};
       this.triforceAnimationCount++;
-      game.engine.drawLight($('light-star'), this.x + 70, this.y+60, 200, 1, this.triforceAnimationCount / 10);
+      game.engineVoxel.drawLight($('light-star'), this.x + 70, this.y+60, 200, 1, this.triforceAnimationCount / 10);
       if (flashFrames[this.triforceAnimationCount]) {
-        game.engine.drawLight($('light-lantern'), this.x, this.y,500);
-        game.engine.drawLight($('light-lantern'), this.x, this.y,500);
-        game.engine.drawLight($('light-star'), this.x, this.y,100);
+        game.engineVoxel.drawLight($('light-lantern'), this.x, this.y,500);
+        game.engineVoxel.drawLight($('light-lantern'), this.x, this.y,500);
+        game.engineVoxel.drawLight($('light-star'), this.x, this.y,100);
       }
       if (this.triforceAnimationCount > 170) {
         this.triforceAnimationCount = false;
@@ -191,7 +191,7 @@ ace.Avatar.prototype.onTick = function(game) {
       }
     }
 
-    game.engine.drawLight($('light-lantern'), this.x, this.y,100);
+    game.engineVoxel.drawLight($('light-lantern'), this.x, this.y,100);
     return;
   }
 
@@ -400,9 +400,9 @@ ace.Avatar.prototype.onTick = function(game) {
 
   // Now render his shadow into the light map.
   if (this.isInUnderworld()) {
-    game.engine.drawLight($('light-lantern'), this.x, this.y,100);
+    game.engineVoxel.drawLight($('light-lantern'), this.x, this.y,100);
   } else {
-    //game.engine.drawLight($('shadow-round'), this.x + 8, this.y + 4,16);
+    //game.engineVoxel.drawLight($('shadow-round'), this.x + 8, this.y + 4,16);
   }
 };
 

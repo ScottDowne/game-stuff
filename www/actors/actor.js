@@ -474,7 +474,7 @@ ace.Actor.prototype.draw = function (opt_name, opt_position, opt_rotZ, opt_rotX,
     var rotX2 = opt_rotX2 || this.rotX2;
     var renderNegativeColor = this.renderNegativeColor;
 
-    this.game.engine.drawSingleSprite(name, pos, rotZ, null,
+    this.game.engineVoxel.drawSingleSprite(name, pos, rotZ, null,
         rotX, rotX2, renderNegativeColor);
   }
 };
